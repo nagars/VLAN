@@ -45,18 +45,24 @@ if [ "$FLAG" = 's' ]
 then 
 	if [ -z "$1" ]					#Checks if an argument was given
 	then
-		echo "All Defined VLAN's:"
-		
-		cat /proc/net/vlan/*		
+		#If no argument, display properties of all VLAN's. Ignores the config file
+		echo "All Defined VLAN's:"	
+		find /proc/net/vlan/ -type f ! -name 'config' -exec cat {} \;		
 
-	elif [ "${1:0:3}" = "eth" ]			#Checks if an ethernet port was given
+	elif [ "${1:0:3}" = "eth" ] && [ "${1:3:2}" -ge 0 ] &>/dev/null	#Checks if an ethernet port was given. Type Warning suppressed.
 	then	
-		PORT= ${1:0:4}
-		echo "Port Name: $PORT"
+		#Finds all files associated with the port provided and displays them. Ignore the config file
+		find /proc/net/vlan -type f ! -name 'config' -exec grep -w "Device: $1" {} \; -exec cat {} \;
+
+	elif [ "$1" -ge 0 ] &>/dev/null && [ "$1" -le 4094 ]	#Checks if a VLAN ID was provided. Error suppressed due to type conflict warning 
+	then
+		#Finds all files associated with the VLAN ID provided and displays them. Ignore the config file.
+		find /proc/net/vlan -type f ! -name 'config' -exec grep -w "VID: $1" {} \; -exec cat {} \;
 	
-	else 
-		echo "Invald PORT provided"
-		exit 0
+	else							#Assumed that VLAN Name was provided 
+		#Finds all files associated with the VLAN Name provided and display them
+		find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$1" {} \; -exec cat {} \;
+	
 	fi
 
 	exit 1
@@ -84,13 +90,15 @@ then
 	echo "	-h,-help			: Help"
 	echo -e "					Prints help information regarding usage of the script\n"
 	echo "	-l,list				: List all VLAN's"
-	echo -e "					Lists all define VLAN's in a table\n"
+	echo -e "					Lists all defined VLAN's in a table by NAME|ID|PORT\n"
 	echo "	-s,-show			: Show all VLAN's"
-	echo -e "					Prints properties of all VLAN's currently defined\n"
-	echo "	-s,-show [NAME]			: Show VLAN"
-	echo -e "					Prints properties of specified VLAN by name\n"	
+	echo -e "					Prints information of all VLAN's\n"
+	echo "	-s,-show [VLAN ID]		: Show VLAN"
+	echo -e "					Prints information of VLAN's by ID\n"	
 	echo " 	-s.-show [PORT]			: Show VLAN"
-	echo -e "					Prints properties of VLAN on specified port\n"
+	echo -e "					Prints information of VLAN's by port\n"
+	echo " 	-s.-show [NAME]			: Show VLAN"
+	echo -e "					Prints information of VLAN by name\n"
 	echo "	-r,-remove [NAME]		: Remove VLAN"
 	echo -e " 					Removes the specified VLAN by Name\n"
 	
