@@ -32,12 +32,14 @@ function func_print_usage {
 	echo -e "					Assigns the VLAN header prio field to the linux internal packet priority for incoming frames\n"	
 	echo "	-e [EGRESS_PRIORITY]		: Sets egress priority"
 	echo -e "					Assigns the VLAN header prio field to the linux internal packet priority for outgoing frames\n"	
-	echo "	-a [IP_ADDRESS]			: Assigns an IP Address"
-	echo -e "					Assigns a gateway address to the VLAN for inter VLAN communication\n"	
 	echo "	-p				: Makes the VLAN permanent"
 	echo -e "					Edits the network config file to make the VLAN enabled on Boot\n"
 	echo "	-n [VLAN_NAME]				: Sets a custom VLAN name"
 	echo -e "					Instead of the default [PORT].[VLAN_ID] name, user provided name is used for the VLAN\n"
+
+	echo "Usage Examples:"
+	echo "./vlan.sh eth0 50 -n example_port -i "2:2 3:7" -e "0:1 3:2" " 
+	echo "./vlan.sh -s example_port"	
 }
 
 function func_show_vlan {
@@ -78,7 +80,7 @@ function func_remove_vlan {
 function func_essential_arguments_valid {
 
 	#Ensures that valid PORT name is provided when no option is given or when options that require a port name and vlan id are used
-	if [ -z "$PORT" ] || [ "$PORT" = '-r' ] || [ "$PORT" = '-n' ] || [ "$PORT" = '-p' ] || [ "$PORT" = '-i' ] || [ "$PORT" = '-e' ] || [ "$PORT" = '-a' ]
+	if [ -z "$PORT" ] || [ "$PORT" = '-r' ] || [ "$PORT" = '-n' ] || [ "$PORT" = '-p' ] || [ "$PORT" = '-i' ] || [ "$PORT" = '-e' ] 
 	then
 		echo "Error: Essential Arguments not provided"
 		func_print_usage
@@ -121,7 +123,7 @@ fi
 #Accept options with script
 #Note- Single colon implies a required argument, OPTARG will be valid.
 #No colon implies no argument needed, OPTARG will be null
-while getopts 'lshpn:r:i:e:a:' option
+while getopts 'lshpn:r:i:e:' option
 do
 	case $option in
 		(l)
@@ -150,23 +152,11 @@ do
 			;;
 		(i)
 			INGRESS_PRIORITY_FLAG='i'
-			set -f 		#Disable GLOB
-			IFS=' '		#Split on space character
-			INGRESS_MAP=($OPTARG)
-			shift
+			INGRESS_MAP=$OPTARG	
 			;;
 		(e)
 			EGRESS_PRIORITY_FLAG='e'
-			set -f 		#Disable GLOB
-			IFS=' '		#Split on space character
-			EGRESS_MAP=($OPTARG)
-			shift
-			;;
-		(a)
-			IP_ADDRESS_FLAG='a'	
-			set -f 		#Disable GLOB
-			IP_ADDRESS=($OPTARG)
-			shift
+			EGRESS_MAP=$OPTARG
 			;;
 		(*)
 			echo -e "Error: Invalid Option Provided / Missing Argument\n"
@@ -196,25 +186,19 @@ fi
 #If both egress and ingress parameters are provided
 if [ "$EGRESS_PRIORITY_FLAG" = 'e' ] && [ "$INGRESS_PRIORITY_FLAG" = 'i' ]
 then
-	ip link add link $PORT name $NAME type vlan id $ID egress-qos-map "$EGRESS_MAP" ingress-qos-map "$INGRESS_MAP"
+	ip link add link $PORT name $NAME type vlan id $ID egress-qos-map $EGRESS_MAP ingress-qos-map $INGRESS_MAP
 #If only egress parameters are provided
 elif [ "$EGRESS_PRIORITY_FLAG" = 'e' ]
 then
-	ip link add link $PORT name $NAME type vlan id $ID egress-qos-map "$EGRESS_MAP" 
+	ip link add link $PORT name $NAME type vlan id $ID egress-qos-map $EGRESS_MAP
 #If only ingress parameters are provided
 elif [ "$INGRESS_PRIORITY_FLAG" = 'i' ]
 then
-	ip link add link $PORT name $NAME type vlan id $ID ingress-qos-map "$INGRESS_MAP" 
+	ip link add link $PORT name $NAME type vlan id $ID ingress-qos-map $INGRESS_MAP 
 #If no ingress/egress parameters are provided
 else
 	ip link add link $PORT name $NAME type vlan id $ID
 
-fi
-
-#If an IP Address was provided, assign it to this the VLAN as a gateway address
-if [ "$IP_ADDRESS_FLAG" = 'a' ]
-then
-	ip addr add "$IP_ADDRESS/24" brd 192.168.1.255 dev $NAME
 fi
 
 #Enable VLAN
