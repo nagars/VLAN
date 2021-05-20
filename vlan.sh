@@ -8,9 +8,9 @@ set -e
 #Function Definitions#
 
 #Prints usage information to terminal
-function print_usage {
+function func_print_usage {
 
-	echo "VLAN Configuration Script"
+	echo "USAGE: VLAN Configuration Script"
 	echo "Brief: Implements a VLAN on the provided Ethernet Port with ID. Automatically names VLAN [PORT].[VLAN ID]"
 	echo "Default Usage: 		./vlan.sh [PORT] [VLAN ID] -optional arguments- [-i INGRESS_PRIORITY] [-e EGRESS PRIORITY] [-a IP_ADDRESS] [-p]"
 	echo "			./vlan.sh [-hls]"
@@ -38,51 +38,8 @@ function print_usage {
 	echo -e "					Edits the network config file to make the VLAN enabled on Boot\n"
 }
 
-###########
+function func_show_vlan {
 
-#Accept options with script
-#Note- Single colon implies a required argument, and no colon
-#implies no argument needed
-while getopts 'lsr:h' option
-do
-	case $option in
-		(l)
-			FLAG='l'
-			shift
-			;;
-		(s)
-			FLAG='s'	
-			shift
-			;;
-		(r)
-			FLAG='r'
-			shift
-			;;
-		(h)
-			FLAG='h'
-			shift
-			;;
-		(p)
-			FLAG='p'
-
-		(*)
-			echo "Error: Invalid Option Provided"
-			print_usage
-			exit 0
-			;;
-	esac
-done
-
-#Lists all VLAN's
-if [ "$FLAG" = 'l' ]
-then
-	cat /proc/net/vlan/config
-	exit 1
-fi
-
-#Prints VLAN information
-if [ "$FLAG" = 's' ]
-then 
 	#Checks if an argument was provided
 	if [ -z "$1" ]			
 	then
@@ -95,18 +52,14 @@ then
 		find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$1" {} \; -exec cat {} \;
 	
 	fi
+}
 
-	exit 1
-fi
-
-#Removes a VLAN
-if [ "$FLAG" = 'r' ]
-then
+function func_remove_vlan {
 	#Ensures VLAN name was provided
 	if [ -z "$1" ]
 	then
 		echo "Error: No VLAN Name Given"
-		print_usage
+		func_print_usage
 		exit 0
 	else
 		#Disable VLAN
@@ -117,54 +70,118 @@ then
 		#Confirms removal
 		ip link show $1
 	fi
-	exit 1
-fi
+}
 
-#Prints help information
-if [ "$FLAG" = 'h' ]
+function func_essential_arguments_valid {
+	
+	#Ensures first 2 arguments are given
+	if [ -z "$PORT" ] && [ -z "$ID" ]
+	then
+		echo "Error: Essential Arguments not provided"
+		func_print_usage
+		exit 0
+	fi
+
+	# Ensures script is used to create a VLAN on Ethernet only
+	if [ ${PORT:0:3} != "eth" ]
+	then
+		echo "Error: Ethernet Interface not provided"
+		func_print_usage
+		exit 0
+	fi
+
+	# Ensures VLAN ID is valid
+	if [ $ID -lt 0 ] || [ $ID -gt 4094 ]
+	then
+		echo "Error: VLAN ID is not valid"
+		func_print_usage
+		exit 0
+	fi
+}
+###########
+
+#Accept options with script
+#Note- Single colon implies a required argument, OPTARG will be valid.
+#No colon implies no argument needed, OPTARG will be null
+while getopts 'lshpr:i:e:a:' option
+do
+	case $option in
+		(l)
+			cat /proc/net/vlan/config
+			shift
+			exit 1
+			;;
+		(s)
+			SHOW_VLAN='s'
+			shift
+			;;
+		(r)
+			func_remove_vlan $OPTARG
+			exit 1
+			;;
+		(h)
+			func_print_usage
+			exit 1
+			;;
+		(p)
+			MAKE_PERMANENT_FLAG='p'
+			shift
+			;;
+		(i)
+			INGRESS_PRIORITY_FLAG='i'
+			shift
+			;;
+		(e)
+			EGRESS_PRIORITY_FLAG='e'
+			shift
+			;;
+		(a)
+			IP_ADDRESS_FLAG='a'
+			shift
+			;;
+		(*)
+			echo -e "Error: Invalid Option Provided / Missing Argument\n"
+			func_print_usage
+			exit 0
+			;;
+	esac
+done
+
+#Show VLAN's currently defined
+#Called after getopts since arguments with '-s' flag are optional, $OPTARGS will always be null 
+#and $1 will not be valid until after the loop
+if [ "$SHOW_VLAN" = 's' ]
 then
-	print_usage				
+	#Calls function with first argument as VLAN Name if given
+	func_show_vlan $1
 	exit 1
 fi
 
 #Accepts arguments
 PORT=${1}
 ID=${2}
-PRIORITY=${3}
 
-#Ensures first 2 arguments are given
-if [ -z "$PORT" ] && [ -z "$ID" ]
-then
-	echo "Error: Essential Arguments not provided"
-	print_usage
-	exit 0
-fi
+#Checks if required arguments are valid
+func_essential_arguments_valid
 
-# Ensures script is used to create a VLAN on Ethernet only
-if [ ${PORT:0:3} != "eth" ]
-then
-	echo "Error: Ethernet Interface not provided"
-	print_usage
-	exit 0
-fi
 
 #Checks if priority was provided as an argument
-if [ -z "$PRIORITY" ]
-then	
+#if [ -z "$PRIORITY" ]
+#then	
 	#If not given
 	#Creates new VLAN on assigned ethernet device with default priority
-	ip link add link $PORT name "$PORT.$ID" type vlan id $IDi 		
+#	ip link add link $PORT name "$PORT.$ID" type vlan id $IDi 		
 	#Enable VLAN
-	(ip link set dev "$PORT.$ID" up)
-	echo -e "VLAN created successfully. Details below:\n"
+#	(ip link set dev "$PORT.$ID" up)
+#	echo -e "VLAN created successfully. Details below:\n"
 	
 	#Finds all files associated with the VLAN Name provided and display them
-	find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$PORT.$ID" {} \; -exec cat {} \;
+#	find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$PORT.$ID" {} \; -exec cat {} \;
 
 #else
 #	if [ $PRIORITY -ge 0 ] && [ $PRIORITY -le 7 ]
 #	then
 #		ip link add link $PORT name "$PORT.$ID" type vlan id $ID egress-qos-map  
-fi
+#fi
 
 exit 1
