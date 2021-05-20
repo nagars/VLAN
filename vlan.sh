@@ -13,7 +13,7 @@ function func_print_usage {
 	echo "USAGE: VLAN Configuration Script"
 	echo "Brief: Implements a VLAN on the provided Ethernet Port with ID. Automatically names VLAN [PORT].[VLAN ID]"
 	echo "Default Usage: 		./vlan.sh [PORT] [VLAN ID] -optional arguments- [-n VLAN_NAME] [-i INGRESS_PRIORITY] [-e EGRESS PRIORITY] [-a IP_ADDRESS] [-p]"
-	echo "			./vlan.sh [-hls]"
+	echo "			./vlan.sh [-h] [-l] [-s]"
 	echo "			./vlan.sh [-s VLAN_NAME]"
 	echo "			./vlan.sh [-r VLAN_NAME]"
 
@@ -33,7 +33,7 @@ function func_print_usage {
 	echo "	-e [EGRESS_PRIORITY]		: Sets egress priority"
 	echo -e "					Assigns the VLAN header prio field to the linux internal packet priority for outgoing frames\n"	
 	echo "	-a [IP_ADDRESS]			: Assigns an IP Address"
-	echo -e "					Assigns an IP address to the VLAN for inter VLAN communication\n"	
+	echo -e "					Assigns a gateway address to the VLAN for inter VLAN communication\n"	
 	echo "	-p				: Makes the VLAN permanent"
 	echo -e "					Edits the network config file to make the VLAN enabled on Boot\n"
 	echo "	-n [VLAN_NAME]				: Sets a custom VLAN name"
@@ -47,12 +47,13 @@ function func_show_vlan {
 	then
 		#If no argument, display properties of all VLAN's. Ignores the config file
 		echo "All Defined VLAN's:"	
-		find /proc/net/vlan/ -type f ! -name 'config' -exec cat {} \;			
+		find /proc/net/vlan/ -type f ! -name 'config' -exec cat {} \; -exec echo"" \;			
 	else	
 		#Assumed that VLAN Name was provided 
 		#Finds file associated with the VLAN Name provided and display its information
-		find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$1" {} \; -exec cat {} \;
-	
+		find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$1" {} \; -exec cat {} \; -exec echo "" \;
+		ip -d link show "$1"
+			
 	fi
 }
 
@@ -68,7 +69,7 @@ function func_remove_vlan {
 		(ip link set dev $1 down)
 		#Delete VLAN
 		ip link delete $1
-		echo "$1 removed successfully."
+		echo "$1 Removed Successfully."
 		#Confirms removal
 		ip link show $1
 	fi
@@ -76,16 +77,17 @@ function func_remove_vlan {
 
 function func_essential_arguments_valid {
 
-	#Ensures first 2 arguments are given
+	#Ensures that valid PORT name is provided when no option is given or when options that require a port name and vlan id are used
 	if [ -z "$PORT" ] || [ "$PORT" = '-r' ] || [ "$PORT" = '-n' ] || [ "$PORT" = '-p' ] || [ "$PORT" = '-i' ] || [ "$PORT" = '-e' ] || [ "$PORT" = '-a' ]
 	then
 		echo "Error: Essential Arguments not provided"
 		func_print_usage
 		exit 0
 
+	#Checks if the first argument is an option that does not require a valid port name and vlan id
 	elif [ "$PORT" = '-l' ] || [ "$PORT" = '-s' ] || [ "$PORT" = '-h' ]
 	then
-		return
+		echo 0
 	fi
 
 	# Ensures script is used to create a VLAN on Ethernet only
@@ -96,26 +98,25 @@ function func_essential_arguments_valid {
 		exit 0
 	fi
 
-	# Ensures VLAN ID is valid
-	if [ $ID -lt 0 ] || [ $ID -gt 4094 ]
-	then
-		echo "Error: VLAN ID is not valid"
-		func_print_usage
-		exit 0
-	fi
+	echo 1
 
-	#If Port and ID are valid, shifts argument index by 2	
-	shift 
-	shift
 }
+
 ###########
 
 #Accepts arguments
 PORT=${1}
 ID=${2}
 
-#Checks if required arguments are valid
-func_essential_arguments_valid
+#Checks if required arguments have been provided and are valid
+ARG_VALID=$(func_essential_arguments_valid)
+
+#If port name and VLAN ID are provided, shift argument index by 2
+if [ "$ARG_VALID" = "1" ]
+then
+	shift
+	shift
+fi
 
 #Accept options with script
 #Note- Single colon implies a required argument, OPTARG will be valid.
@@ -164,8 +165,7 @@ do
 		(a)
 			IP_ADDRESS_FLAG='a'	
 			set -f 		#Disable GLOB
-			IFS=' '		#Split on space character
-			EGRESS_MAP=($OPTARG)
+			IP_ADDRESS=($OPTARG)
 			shift
 			;;
 		(*)
@@ -186,24 +186,46 @@ then
 	exit 1
 fi
 
+#If a name for the VLAN was not provided by the user, create default name
+if [ -z "$NAME"	]
+then
+	NAME="$PORT.$ID"
+fi
 
-#Checks if priority was provided as an argument
-#if [ -z "$PRIORITY" ]
-#then	
-	#If not given
-	#Creates new VLAN on assigned ethernet device with default priority
-#	ip link add link $PORT name "$PORT.$ID" type vlan id $IDi 		
-	#Enable VLAN
-#	(ip link set dev "$PORT.$ID" up)
-#	echo -e "VLAN created successfully. Details below:\n"
-	
-	#Finds all files associated with the VLAN Name provided and display them
-#	find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$PORT.$ID" {} \; -exec cat {} \;
+#Creates new VLAN
+#If both egress and ingress parameters are provided
+if [ "$EGRESS_PRIORITY_FLAG" = 'e' ] && [ "$INGRESS_PRIORITY_FLAG" = 'i' ]
+then
+	ip link add link $PORT name $NAME type vlan id $ID egress-qos-map "$EGRESS_MAP" ingress-qos-map "$INGRESS_MAP"
+#If only egress parameters are provided
+elif [ "$EGRESS_PRIORITY_FLAG" = 'e' ]
+then
+	ip link add link $PORT name $NAME type vlan id $ID egress-qos-map "$EGRESS_MAP" 
+#If only ingress parameters are provided
+elif [ "$INGRESS_PRIORITY_FLAG" = 'i' ]
+then
+	ip link add link $PORT name $NAME type vlan id $ID ingress-qos-map "$INGRESS_MAP" 
+#If no ingress/egress parameters are provided
+else
+	ip link add link $PORT name $NAME type vlan id $ID
 
-#else
-#	if [ $PRIORITY -ge 0 ] && [ $PRIORITY -le 7 ]
-#	then
-#		ip link add link $PORT name "$PORT.$ID" type vlan id $ID egress-qos-map  
-#fi
+fi
+
+#If an IP Address was provided, assign it to this the VLAN as a gateway address
+if [ "$IP_ADDRESS_FLAG" = 'a' ]
+then
+	ip addr add "$IP_ADDRESS/24" brd 192.168.1.255 dev $NAME
+fi
+
+#Enable VLAN
+(ip link set dev $NAME up)
+
+echo -e "VLAN created successfully. Details below:\n"	
+#Finds all files associated with the VLAN Name provided and display them
+find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$NAME" {} \; -exec cat {} \; -exec echo "" \;
+#Show status
+ip -d link show "$NAME"
+
+#Configure network file to make the VLAN enabled on boot if required
 
 exit 1
