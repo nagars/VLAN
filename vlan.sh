@@ -5,9 +5,9 @@
 #sets flag to exit upon failure of any command
 set -e
 
-#Function Definitions#
+######Function Definitions######
 
-#Prints usage information to terminal
+#Function Description: Prints usage information to terminal
 function func_print_usage {
 
 	echo "USAGE: VLAN Configuration Script"
@@ -40,6 +40,8 @@ function func_print_usage {
 	echo -e "./vlan.sh -s example_port\n"	
 }
 
+#Function Description: Checks if a VLAN name was given. If yes, searches for associated file and prints information. If not name given,
+#prints information for all defined VLAN's
 function func_show_vlan {
 
 	#Checks if an argument was provided
@@ -57,6 +59,7 @@ function func_show_vlan {
 	fi
 }
 
+#Function Description: Accepts a VLAN name, disables and deletes said VLAN ad confirms removal
 function func_remove_vlan {
 	#Ensures VLAN name was provided
 	if [ -z "$1" ]
@@ -75,6 +78,7 @@ function func_remove_vlan {
 	fi
 }
 
+#Function Description: Checks if essential arguments are provided and valid.
 function func_essential_arguments_valid {
 
 	#Ensures that valid PORT name is provided when no option is given or when options that require a port name and vlan id are used
@@ -102,23 +106,22 @@ function func_essential_arguments_valid {
 
 }
 
-###########
+###############
 
-#Accepts arguments
+#Accepts required arguments
 PORT=${1}
 ID=${2}
 
 #Checks if required arguments have been provided and are valid
 ARG_VALID=$(func_essential_arguments_valid)
-
-#If port name and VLAN ID are provided, shift argument index by 2
+#If port name and VLAN ID are provided and valid, shift argument index by 2
 if [ "$ARG_VALID" = "1" ]
 then
 	shift
 	shift
 fi
 
-#Accept options with script
+#Accept options and associated arguments
 #Note- Single colon implies a required argument, OPTARG will be valid.
 #No colon implies no argument needed, OPTARG will be null
 while getopts 'lshn:r:i:e:' option
@@ -162,7 +165,7 @@ done
 
 #Show VLAN's currently defined
 #Called after getopts since arguments with '-s' flag are optional, $OPTARGS will always be null 
-#and $1 will not be valid until after the loop
+#and $1 will not be valid until after the getopts loop
 if [ "$SHOW_VLAN" = 's' ]
 then
 	#Calls function with first argument as VLAN Name if given
@@ -170,7 +173,7 @@ then
 	exit 1
 fi
 
-#If a name for the VLAN was not provided by the user, create default name
+#If a name for the VLAN to be created was not provided by the user, create default name
 if [ -z "$NAME"	]
 then
 	NAME="$PORT.$ID"
@@ -181,14 +184,17 @@ fi
 if [ "$EGRESS_PRIORITY_FLAG" = 'e' ] && [ "$INGRESS_PRIORITY_FLAG" = 'i' ]
 then
 	ip link add link $PORT name $NAME type vlan id $ID egress-qos-map $EGRESS_MAP ingress-qos-map $INGRESS_MAP
+
 #If only egress parameters are provided
 elif [ "$EGRESS_PRIORITY_FLAG" = 'e' ]
 then
 	ip link add link $PORT name $NAME type vlan id $ID egress-qos-map $EGRESS_MAP
+
 #If only ingress parameters are provided
 elif [ "$INGRESS_PRIORITY_FLAG" = 'i' ]
 then
 	ip link add link $PORT name $NAME type vlan id $ID ingress-qos-map $INGRESS_MAP 
+
 #If no ingress/egress parameters are provided
 else
 	ip link add link $PORT name $NAME type vlan id $ID
@@ -199,9 +205,9 @@ fi
 (ip link set dev $NAME up)
 
 echo -e "VLAN created successfully. Details below:\n"	
-#Finds all files associated with the VLAN Name provided and display them
+#Finds all files associated with the VLAN Name provided and display their contents
 find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$NAME" {} \; -exec cat {} \; -exec echo "" \;
-#Show status
+#Show status of VLAN
 ip -d link show "$NAME"
 
 exit 1
