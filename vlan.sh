@@ -77,9 +77,10 @@ function func_essential_arguments_valid {
 	#Ensures first 2 arguments are given
 	if [ -z "$PORT" ] && [ -z "$ID" ]
 	then
-		echo "Error: Essential Arguments not provided"
-		func_print_usage
-		exit 0
+		#echo "Error: Essential Arguments not provided"
+		#func_print_usage
+		#exit 0
+		return
 	fi
 
 	# Ensures script is used to create a VLAN on Ethernet only
@@ -97,18 +98,28 @@ function func_essential_arguments_valid {
 		func_print_usage
 		exit 0
 	fi
+
+	#If Port and ID are valid, shifts argument index by 2	
+	shift 
+	shift
 }
 ###########
+
+#Accepts arguments
+PORT=${1}
+ID=${2}
+
+#Checks if required arguments are valid
+func_essential_arguments_valid
 
 #Accept options with script
 #Note- Single colon implies a required argument, OPTARG will be valid.
 #No colon implies no argument needed, OPTARG will be null
-while getopts 'lshpr:i:e:a:' option
+while getopts 'lshpPINr:i:e:a:' option
 do
 	case $option in
 		(l)
 			cat /proc/net/vlan/config
-			shift
 			exit 1
 			;;
 		(s)
@@ -129,14 +140,23 @@ do
 			;;
 		(i)
 			INGRESS_PRIORITY_FLAG='i'
+			set -f 		#Disable GLOB
+			IFS=' '		#Split on space character
+			INGRESS_MAP=($OPTARG)
 			shift
 			;;
 		(e)
 			EGRESS_PRIORITY_FLAG='e'
+			set -f 		#Disable GLOB
+			IFS=' '		#Split on space character
+			EGRESS_MAP=($OPTARG)
 			shift
 			;;
 		(a)
-			IP_ADDRESS_FLAG='a'
+			IP_ADDRESS_FLAG='a'	
+			set -f 		#Disable GLOB
+			IFS=' '		#Split on space character
+			EGRESS_MAP=($OPTARG)
 			shift
 			;;
 		(*)
@@ -157,12 +177,6 @@ then
 	exit 1
 fi
 
-#Accepts arguments
-PORT=${1}
-ID=${2}
-
-#Checks if required arguments are valid
-func_essential_arguments_valid
 
 
 #Checks if priority was provided as an argument
