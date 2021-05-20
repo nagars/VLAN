@@ -12,7 +12,7 @@ function func_print_usage {
 
 	echo "USAGE: VLAN Configuration Script"
 	echo "Brief: Implements a VLAN on the provided Ethernet Port with ID. Automatically names VLAN [PORT].[VLAN ID]"
-	echo "Default Usage: 		./vlan.sh [PORT] [VLAN ID] -optional arguments- [-n VLAN_NAME] [-i INGRESS_PRIORITY] [-e EGRESS PRIORITY] [-a IP_ADDRESS] [-p]"
+	echo "Default Usage: 		./vlan.sh [PORT] [VLAN ID] -optional arguments- [-n VLAN_NAME] [-i INGRESS_PRIORITY] [-e EGRESS PRIORITY] "
 	echo "			./vlan.sh [-h] [-l] [-s]"
 	echo "			./vlan.sh [-s VLAN_NAME]"
 	echo "			./vlan.sh [-r VLAN_NAME]"
@@ -32,14 +32,12 @@ function func_print_usage {
 	echo -e "					Assigns the VLAN header prio field to the linux internal packet priority for incoming frames\n"	
 	echo "	-e [EGRESS_PRIORITY]		: Sets egress priority"
 	echo -e "					Assigns the VLAN header prio field to the linux internal packet priority for outgoing frames\n"	
-	echo "	-p				: Makes the VLAN permanent"
-	echo -e "					Edits the network config file to make the VLAN enabled on Boot\n"
 	echo "	-n [VLAN_NAME]				: Sets a custom VLAN name"
 	echo -e "					Instead of the default [PORT].[VLAN_ID] name, user provided name is used for the VLAN\n"
 
 	echo "Usage Examples:"
 	echo "./vlan.sh eth0 50 -n example_port -i "2:2 3:7" -e "0:1 3:2" " 
-	echo "./vlan.sh -s example_port"	
+	echo -e "./vlan.sh -s example_port\n"	
 }
 
 function func_show_vlan {
@@ -80,7 +78,7 @@ function func_remove_vlan {
 function func_essential_arguments_valid {
 
 	#Ensures that valid PORT name is provided when no option is given or when options that require a port name and vlan id are used
-	if [ -z "$PORT" ] || [ "$PORT" = '-r' ] || [ "$PORT" = '-n' ] || [ "$PORT" = '-p' ] || [ "$PORT" = '-i' ] || [ "$PORT" = '-e' ] 
+	if [ -z "$PORT" ] || [ "$PORT" = '-r' ] || [ "$PORT" = '-n' ] || [ "$PORT" = '-i' ] || [ "$PORT" = '-e' ] 
 	then
 		echo "Error: Essential Arguments not provided"
 		func_print_usage
@@ -123,7 +121,7 @@ fi
 #Accept options with script
 #Note- Single colon implies a required argument, OPTARG will be valid.
 #No colon implies no argument needed, OPTARG will be null
-while getopts 'lshpn:r:i:e:' option
+while getopts 'lshn:r:i:e:' option
 do
 	case $option in
 		(l)
@@ -141,10 +139,6 @@ do
 		(h)
 			func_print_usage
 			exit 1
-			;;
-		(p)
-			MAKE_PERMANENT_FLAG='p'
-			shift
 			;;
 		(n)
 			NAME=$OPTARG
@@ -209,7 +203,5 @@ echo -e "VLAN created successfully. Details below:\n"
 find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$NAME" {} \; -exec cat {} \; -exec echo "" \;
 #Show status
 ip -d link show "$NAME"
-
-#Configure network file to make the VLAN enabled on boot if required
 
 exit 1
