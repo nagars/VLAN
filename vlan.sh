@@ -12,7 +12,10 @@ function print_usage {
 
 	echo "VLAN Configuration Script"
 	echo "Brief: Implements a VLAN on the provided Ethernet Port with ID. Automatically names VLAN [PORT].[VLAN ID]"
-	echo -e "Default Usage: ./vlan.sh [FLAGS] [PORT] [VLAN ID] [PRIORITY]\n"
+	echo "Default Usage: 		./vlan.sh [PORT] [VLAN ID] -optional arguments- [-i INGRESS_PRIORITY] [-e EGRESS PRIORITY] [-a IP_ADDRESS] [-p]"
+	echo "			./vlan.sh [-hls]"
+	echo "			./vlan.sh [-s VLAN_NAME]"
+	echo "			./vlan.sh [-r VLAN_NAME]"
 
 	echo "[Optional Flags]:"
 	echo "	-h				: Help"
@@ -21,10 +24,18 @@ function print_usage {
 	echo -e "					Lists all defined VLAN's in a table by NAME|ID|PORT\n"
 	echo "	-s				: Show all VLAN's"
 	echo -e "					Prints information of all VLAN's\n"
-	echo "	-s [NAME]			: Show VLAN"
+	echo "	-s [VLAN_NAME]			: Show VLAN"
 	echo -e "					Prints information of specified VLAN by name\n"
-	echo "	-r [NAME]			: Remove VLAN"
+	echo "	-r [VLAN_NAME]			: Remove VLAN"
 	echo -e " 					Removes the specified VLAN by Name\n"
+	echo "	-i [INGRESS_PRIORITY]		: Sets ingress priority"
+	echo -e "					Assigns the VLAN header prio field to the linux internal packet priority for incoming frames\n"	
+	echo "	-e [EGRESS_PRIORITY]		: Sets egress priority"
+	echo -e "					Assigns the VLAN header prio field to the linux internal packet priority for outgoing frames\n"	
+	echo "	-a [IP_ADDRESS]			: Assigns an IP Address"
+	echo -e "					Assigns an IP address to the VLAN for inter VLAN communication\n"	
+	echo "	-p				: Makes the VLAN permanent"
+	echo -e "					Edits the network config file to make the VLAN enabled on Boot\n"
 }
 
 ###########
@@ -51,6 +62,9 @@ do
 			FLAG='h'
 			shift
 			;;
+		(p)
+			FLAG='p'
+
 		(*)
 			echo "Error: Invalid Option Provided"
 			print_usage
@@ -95,6 +109,9 @@ then
 		print_usage
 		exit 0
 	else
+		#Disable VLAN
+		(ip link set dev $1 down)
+		#Delete VLAN
 		ip link delete $1
 		echo "$1 removed successfully."
 		#Confirms removal
@@ -136,7 +153,9 @@ if [ -z "$PRIORITY" ]
 then	
 	#If not given
 	#Creates new VLAN on assigned ethernet device with default priority
-	ip link add link $PORT name "$PORT.$ID" type vlan id $ID 		
+	ip link add link $PORT name "$PORT.$ID" type vlan id $IDi 		
+	#Enable VLAN
+	(ip link set dev "$PORT.$ID" up)
 	echo -e "VLAN created successfully. Details below:\n"
 	
 	#Finds all files associated with the VLAN Name provided and display them
