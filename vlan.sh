@@ -12,7 +12,7 @@ function func_print_usage {
 
 	echo "USAGE: VLAN Configuration Script"
 	echo "Brief: Implements a VLAN on the provided Ethernet Port with ID. Automatically names VLAN [PORT].[VLAN ID]"
-	echo "Default Usage: 		./vlan.sh [PORT] [VLAN ID] -optional arguments- [-i INGRESS_PRIORITY] [-e EGRESS PRIORITY] [-a IP_ADDRESS] [-p]"
+	echo "Default Usage: 		./vlan.sh [PORT] [VLAN ID] -optional arguments- [-n VLAN_NAME] [-i INGRESS_PRIORITY] [-e EGRESS PRIORITY] [-a IP_ADDRESS] [-p]"
 	echo "			./vlan.sh [-hls]"
 	echo "			./vlan.sh [-s VLAN_NAME]"
 	echo "			./vlan.sh [-r VLAN_NAME]"
@@ -36,6 +36,8 @@ function func_print_usage {
 	echo -e "					Assigns an IP address to the VLAN for inter VLAN communication\n"	
 	echo "	-p				: Makes the VLAN permanent"
 	echo -e "					Edits the network config file to make the VLAN enabled on Boot\n"
+	echo "	-n [VLAN_NAME]				: Sets a custom VLAN name"
+	echo -e "					Instead of the default [PORT].[VLAN_ID] name, user provided name is used for the VLAN\n"
 }
 
 function func_show_vlan {
@@ -73,13 +75,16 @@ function func_remove_vlan {
 }
 
 function func_essential_arguments_valid {
-	
+
 	#Ensures first 2 arguments are given
-	if [ -z "$PORT" ] && [ -z "$ID" ]
+	if [ -z "$PORT" ] || [ "$PORT" = '-r' ] || [ "$PORT" = '-n' ] || [ "$PORT" = '-p' ] || [ "$PORT" = '-i' ] || [ "$PORT" = '-e' ] || [ "$PORT" = '-a' ]
 	then
-		#echo "Error: Essential Arguments not provided"
-		#func_print_usage
-		#exit 0
+		echo "Error: Essential Arguments not provided"
+		func_print_usage
+		exit 0
+
+	elif [ "$PORT" = '-l' ] || [ "$PORT" = '-s' ] || [ "$PORT" = '-h' ]
+	then
 		return
 	fi
 
@@ -115,7 +120,7 @@ func_essential_arguments_valid
 #Accept options with script
 #Note- Single colon implies a required argument, OPTARG will be valid.
 #No colon implies no argument needed, OPTARG will be null
-while getopts 'lshpPINr:i:e:a:' option
+while getopts 'lshpn:r:i:e:a:' option
 do
 	case $option in
 		(l)
@@ -136,6 +141,10 @@ do
 			;;
 		(p)
 			MAKE_PERMANENT_FLAG='p'
+			shift
+			;;
+		(n)
+			NAME=$OPTARG
 			shift
 			;;
 		(i)
@@ -176,7 +185,6 @@ then
 	func_show_vlan $1
 	exit 1
 fi
-
 
 
 #Checks if priority was provided as an argument
