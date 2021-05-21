@@ -144,8 +144,7 @@ do
 			exit 1
 			;;
 		(n)
-			NAME=$OPTARG
-			shift
+			NAME=$OPTARG	
 			;;
 		(i)
 			INGRESS_PRIORITY_FLAG='i'
