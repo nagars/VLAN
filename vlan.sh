@@ -31,13 +31,22 @@ function func_print_usage {
 	echo "	-i [INGRESS_PRIORITY]		: Sets ingress priority"
 	echo -e "					Assigns the VLAN header prio field to the linux internal packet priority for incoming frames\n"	
 	echo "	-e [EGRESS_PRIORITY]		: Sets egress priority"
-	echo -e "					Assigns the VLAN header prio field to the linux internal packet priority for outgoing frames\n"	
-	echo "	-n [VLAN_NAME]				: Sets a custom VLAN name"
+	echo -e "					Assigns the VLAN header priority field to the linux internal packet priority for outgoing frames\n"	
+	echo "	-n [VLAN_NAME]			: Sets a custom VLAN name"
 	echo -e "					Instead of the default [PORT].[VLAN_ID] name, user provided name is used for the VLAN\n"
+	echo "	-a [VLAN IPV4]			: Assigns an IPV4 address to the VLAN"
+	echo -e	"					Defaults to 192.168.1.100\n"
+	echo "	-p				: Makes the VLAN permanent"
+        echo -e	"					The VLAN is made available upon boot\n"		
 
 	echo "Usage Examples:"
-	echo "./vlan.sh eth0 50 -n example_port -i "2:2 3:7" -e "0:1 3:2" " 
+	echo "./vlan.sh eth0 50 -n example_port -i \"2:2 3:7\" -e \"0:1 3:2\" " 
 	echo -e "./vlan.sh -s example_port\n"	
+
+	echo "Additional Notes:"
+	echo "NetMask defaults to 255.255.255.0"
+	echo "Broadcast Address is set to the last viable IP address provided by user. Defaults to 192.168.1.255"
+	echo -e "IPV4 Address is assigned by user. Defaults to 192.168.1.100\n"
 }
 
 #Function Description: Checks if a VLAN name was given. If yes, searches for associated file and prints information. If not name given,
@@ -49,7 +58,7 @@ function func_show_vlan {
 	then
 		#If no argument, display properties of all VLAN's. Ignores the config file
 		echo "All Defined VLAN's:"	
-		find /proc/net/vlan/ -type f ! -name 'config' -exec cat {} \; -exec echo"" \;			
+		find /proc/net/vlan/ -type f ! -name 'config' -exec cat {} \; -exec echo"" \; 			
 	else	
 		#Assumed that VLAN Name was provided 
 		#Finds file associated with the VLAN Name provided and display its information
@@ -82,7 +91,7 @@ function func_remove_vlan {
 function func_essential_arguments_valid {
 
 	#Ensures that valid PORT name is provided when no option is given or when options that require a port name and vlan id are used
-	if [ -z "$PORT" ] || [ "$PORT" = '-r' ] || [ "$PORT" = '-n' ] || [ "$PORT" = '-i' ] || [ "$PORT" = '-e' ] 
+	if [ -z "$PORT" ] || [ "$PORT" = '-r' ] || [ "$PORT" = '-n' ] || [ "$PORT" = '-i' ] || [ "$PORT" = '-e' ] || [ "$PORT" = '-a' ] || [ "$PORT" = '-p' ]
 	then
 		echo "Error: Essential Arguments not provided"
 		func_print_usage
@@ -103,7 +112,6 @@ function func_essential_arguments_valid {
 	fi
 
 	echo 1
-
 }
 
 ###############
@@ -124,7 +132,7 @@ fi
 #Accept options and associated arguments
 #Note- Single colon implies a required argument, OPTARG will be valid.
 #No colon implies no argument needed, OPTARG will be null
-while getopts 'lshn:r:i:e:' option
+while getopts 'lshpa:n:r:i:e:' option
 do
 	case $option in
 		(l)
@@ -142,6 +150,13 @@ do
 		(h)
 			func_print_usage
 			exit 1
+			;;
+		(p)
+			PERMANENT='p'
+			shift
+			;;
+		(a)
+			IPV4=$OPTARG
 			;;
 		(n)
 			NAME=$OPTARG	
@@ -178,6 +193,12 @@ then
 	NAME="$PORT.$ID"
 fi
 
+#If no IP address is given, set default IP
+if [ -z "$IPV4" ]
+then
+	IPV4="192.168.1.100"
+fi
+
 #Creates new VLAN
 #If both egress and ingress parameters are provided
 if [ "$EGRESS_PRIORITY_FLAG" = 'e' ] && [ "$INGRESS_PRIORITY_FLAG" = 'i' ]
@@ -200,6 +221,8 @@ else
 
 fi
 
+#Assign the IP address and NetMask
+(ip addr add "$IPV4/24" dev $NAME)
 #Enable VLAN
 (ip link set dev $NAME up)
 
@@ -208,5 +231,6 @@ echo -e "VLAN created successfully. Details below:\n"
 find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$NAME" {} \; -exec cat {} \; -exec echo "" \;
 #Show status of VLAN
 ip -d link show "$NAME"
+
 
 exit 1
