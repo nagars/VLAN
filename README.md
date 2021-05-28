@@ -14,8 +14,8 @@ This project involves a bash script designed to implement VLAN's. The script can
 8. Allows the user to assign an egress priority map
 9. Can remove a particular VLAN by name
 10. Prints confirmation once VLAN creation/removal
-11. Can assign a Broadcast IP for specific VLAN
 12. Can assign an IPV4 address for specific VLAN
+13. Can make the VLAN available on boot
 
 ## Software Used
 1. OS:      Ubuntu 20.04
