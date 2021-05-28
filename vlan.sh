@@ -232,5 +232,27 @@ find /proc/net/vlan -type f ! -name 'config' -exec grep -w "$NAME" {} \; -exec c
 #Show status of VLAN
 ip -d link show "$NAME"
 
+#Checks if the VLAN should be enabled on boot
+if [ "$PERMANENT" = 'p' ]
+then
+	#Loads 8021q module to kernel on boot
+	(echo "8021q" >> /etc/modules)
+
+	#Checks if interfaces file exists or not
+	if [ ! -e  /etc/network/interfaces ]
+	then
+	#	cat 	> /etc/network/interfaces
+		echo -e "## INTERFACES \n" > /etc/network/interfaces
+	fi
+
+	#Writes to file with appropriate instructions
+	echo "## VLAN for PORT - $PORT with ID - $ID and NAME - $NAME"	>> /etc/network/interfaces
+	echo "auto $NAME" 		>> /etc/network/interfaces
+	echo "iface $NAME inet static" 	>> /etc/network/interfaces
+	echo "address $IPV4" 		>> /etc/network/interfaces
+	echo "netmask 255.255.255.0" 	>> /etc/network/interfaces
+	echo "vlan-raw-device $NAME" 	>> /etc/network/interfaces
+	echo " " 			>> /etc/network/interfaces
+fi
 
 exit 1
